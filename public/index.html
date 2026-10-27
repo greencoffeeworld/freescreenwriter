@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Screenwriter — Minimal Online Screenplay Editor</title>
+  <meta name="description" content="A distraction-free online screenwriting app with industry-standard formatting, PDF and text export, autosave, comments and shareable projects.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b35b'/%3E%3Cpath d='M10 9h12M10 15h8M14 21h8' stroke='%23141418' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <!-- Home -->
+  <main id="home" class="home" hidden>
+    <div class="home-card">
+      <div class="logo" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h1>Screenwriter</h1>
+      <p class="tagline">Just you and the page.</p>
+      <button id="newBtn" class="primary big">New screenplay</button>
+      <form id="openForm" class="open-form">
+        <input id="openId" placeholder="Have a project ID?" autocomplete="off" spellcheck="false" aria-label="Project ID">
+        <button class="ghost">Open</button>
+      </form>
+      <ul id="recent" class="recent"></ul>
+    </div>
+  </main>
+
+  <!-- Editor -->
+  <div id="app" class="app" hidden>
+    <header class="bar">
+      <a href="#" class="brand" title="Home" aria-label="Home"><span></span><span></span><span></span></a>
+      <input id="title" class="title-input" placeholder="Untitled Screenplay" aria-label="Title" spellcheck="false">
+      <select id="elType" class="el-type" aria-label="Element type">
+        <option value="scene">Scene Heading</option>
+        <option value="action">Action</option>
+        <option value="character">Character</option>
+        <option value="parenthetical">Parenthetical</option>
+        <option value="dialogue">Dialogue</option>
+        <option value="transition">Transition</option>
+      </select>
+      <div class="spacer"></div>
+      <span id="status" class="status" aria-live="polite"></span>
+      <button id="shareBtn" class="chip" title="Copy share link"><span>ID</span><code id="pid"></code></button>
+      <button id="commentsBtn" class="icon" title="Comments (⌘M to add)" aria-label="Comments">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <span id="ccount" class="badge"></span>
+      </button>
+      <button id="titlePageBtn" class="icon" title="Title page" aria-label="Title page">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 3h9l4 4v14H6z M9 11h7 M9 15h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="exportBtn" class="primary" popovertarget="exportMenu">Export</button>
+      <div id="exportMenu" class="menu" popover>
+        <button data-export="pdf"><b>PDF</b><small>Industry-standard, print-ready</small></button>
+        <button data-export="txt"><b>Plain text</b><small>.txt, formatted with spacing</small></button>
+        <button data-export="fountain"><b>Fountain</b><small>Opens in Final Draft, Highland…</small></button>
+        <label class="check"><input type="checkbox" id="withComments"> Include comments in Fountain</label>
+      </div>
+    </header>
+
+    <div class="stage" id="stage">
+      <div class="desk" id="desk">
+        <article class="page" id="page">
+          <div id="editor" class="editor" aria-label="Screenplay"></div>
+        </article>
+        <aside id="gutter" class="gutter" aria-label="Comments"></aside>
+      </div>
+    </div>
+
+    <footer class="hints">
+      <span><kbd>Enter</kbd> next element</span>
+      <span><kbd>Tab</kbd> change element</span>
+      <span><kbd>⌘1–6</kbd> set element</span>
+      <span><kbd>⌘M</kbd> comment</span>
+    </footer>
+  </div>
+
+  <dialog id="tpDialog" class="dialog">
+    <form method="dialog">
+      <h2>Title page</h2>
+      <label>Title<input name="title" autocomplete="off"></label>
+      <label>Written by<input name="author" autocomplete="off"></label>
+      <label>Contact<textarea name="contact" rows="4" placeholder="Name&#10;Email&#10;Phone"></textarea></label>
+      <div class="row"><button class="primary">Done</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
