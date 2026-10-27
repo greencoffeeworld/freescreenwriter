@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Screenwriter — Minimal Online Screenplay Editor</title>
   <meta name="description" content="A distraction-free online screenwriting app with industry-standard formatting, PDF and text export, autosave, comments and shareable projects.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b35b'/%3E%3Cpath d='M10 9h12M10 15h8M14 21h8' stroke='%23141418' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -20,7 +23,7 @@
       <p class="tagline">Just you and the page.</p>
       <button id="newBtn" class="primary big">New screenplay</button>
       <form id="openForm" class="open-form">
-        <input id="openId" placeholder="Have a project ID?" autocomplete="off" spellcheck="false" aria-label="Project ID">
+        <input id="openId" placeholder="Have a project ID?" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Project ID">
         <button class="ghost">Open</button>
       </form>
       <ul id="recent" class="recent"></ul>
@@ -41,7 +44,7 @@
         <option value="transition">Transition</option>
       </select>
       <div class="spacer"></div>
-      <span id="status" class="status" aria-live="polite"></span>
+      <span id="status" class="status" aria-live="polite" title="Save status"></span>
       <button id="shareBtn" class="chip" title="Copy share link"><span>ID</span><code id="pid"></code></button>
       <button id="commentsBtn" class="icon" title="Comments (⌘M to add)" aria-label="Comments">
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
@@ -64,9 +67,22 @@
         <article class="page" id="page">
           <div id="editor" class="editor" aria-label="Screenplay"></div>
         </article>
+        <div id="gutterBackdrop" class="gutter-backdrop"></div>
         <aside id="gutter" class="gutter" aria-label="Comments"></aside>
       </div>
     </div>
+
+    <!-- Touch / mobile formatting bar (stays above on-screen keyboard) -->
+    <nav id="mobileBar" class="mobile-bar" aria-label="Screenplay elements">
+      <button type="button" data-set-type="scene">Scene</button>
+      <button type="button" data-set-type="action">Action</button>
+      <button type="button" data-set-type="character">Character</button>
+      <button type="button" data-set-type="dialogue">Dialogue</button>
+      <button type="button" data-set-type="parenthetical">(Paren)</button>
+      <button type="button" data-set-type="transition">Transition</button>
+      <span class="mobile-bar-sep" aria-hidden="true"></span>
+      <button type="button" id="mobileCommentBtn" class="mobile-comment-btn" title="Add comment on current line">+ Comment</button>
+    </nav>
 
     <footer class="hints">
       <span><kbd>Enter</kbd> next element</span>

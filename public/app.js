@@ -115,11 +115,21 @@ function renderAll() {
   editor.replaceChildren(...S.doc.blocks.map(blockEl));
   renderMeta();
   renderComments();
+  syncTypeUI(byId(S.currentId)?.type || S.doc.blocks[0]?.type || 'scene');
 }
 
 function renderMeta() {
   if (document.activeElement !== $('#title')) $('#title').value = S.doc.title || '';
   document.title = `${S.doc.title || 'Untitled'} — Screenwriter`;
+}
+
+function syncTypeUI(type) {
+  $('#elType').value = type;
+  for (const btn of document.querySelectorAll('#mobileBar [data-set-type]')) {
+    const active = btn.dataset.setType === type;
+    btn.classList.toggle('active', active);
+    if (active) btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }
 }
 
 /* =================== Caret helpers =================== */
@@ -146,10 +156,12 @@ function caretOffset(el) {
   return el.contains(r.startContainer) ? offsetOf(el, r.startContainer, r.startOffset) : 0;
 }
 function selOffsets(el) {
-  const r = getSelection().getRangeAt(0);
-  const s = el.contains(r.startContainer) ? offsetOf(el, r.startContainer, r.startOffset) : 0;
-  const e = el.contains(r.endContainer) ? offsetOf(el, r.endContainer, r.endOffset) : el.textContent.length;
-  return [s, e];
+  const s = getSelection();
+  if (!s.rangeCount) return [0, 0];
+  const r = s.getRangeAt(0);
+  const st = el.contains(r.startContainer) ? offsetOf(el, r.startContainer, r.startOffset) : 0;
+  const en = el.contains(r.endContainer) ? offsetOf(el, r.endContainer, r.endOffset) : el.textContent.length;
+  return [st, en];
 }
 function setCaret(el, off) {
   if (!el) return;
@@ -159,7 +171,7 @@ function setCaret(el, off) {
   r.setStart(n, o); r.collapse(true);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
   const rect = el.getBoundingClientRect();
-  if (rect.bottom > innerHeight - 80 || rect.top < 70) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (rect.bottom > innerHeight - 120 || rect.top < 70) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 function caretLine(el, which) {
   const s = getSelection();
@@ -182,12 +194,12 @@ function touched() {
 }
 
 function setType(b, t) {
-  if (b.type === t) return;
+  if (!b || b.type === t) return;
   b.type = t;
   const el = elOf(b.id);
   el.dataset.type = t;
   el.dataset.placeholder = LABEL[t];
-  $('#elType').value = t;
+  syncTypeUI(t);
   touched();
 }
 
@@ -216,6 +228,35 @@ function moveComments(fromId, toId, shift) {
   for (const c of S.doc.comments) if (c.blockId === fromId) { c.blockId = toId; c.start += shift; c.end += shift; }
 }
 
+/** Split or advance from the current block on Enter / mobile Return. */
+function handleEnter(el) {
+  const b = byId(el.dataset.id);
+  const i = idx(b);
+  const o = caretOffset(el);
+  if (!b.text.trim() && b.type !== 'action' && b.type !== 'scene') { setType(b, 'action'); return; }
+  if (o === 0 && b.text) {
+    insertBlock({ id: uid(), type: b.type, text: '' }, i);
+    touched();
+    return;
+  }
+  const before = b.text.slice(0, o), after = b.text.slice(o);
+  b.text = before; el.textContent = before;
+  const nb = { id: uid(), type: after ? b.type : NEXT[b.type], text: after };
+  for (const c of S.doc.comments) if (c.blockId === b.id && c.start >= o) { c.blockId = nb.id; c.start -= o; c.end -= o; }
+  const nel = insertBlock(nb, i + 1);
+  setCaret(nel, 0);
+  syncTypeUI(nb.type);
+  touched(); paintHighlights();
+}
+
+// Intercept mobile virtual-keyboard Return (`insertParagraph` / `insertLineBreak`) reliably.
+editor.addEventListener('beforeinput', (e) => {
+  if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+    const el = e.target.closest('.block');
+    if (el) { e.preventDefault(); handleEnter(el); }
+  }
+});
+
 editor.addEventListener('input', (e) => {
   const el = e.target.closest('.block');
   if (!el) return;
@@ -240,21 +281,7 @@ editor.addEventListener('keydown', (e) => {
 
   if (e.key === 'Enter' && !e.shiftKey && !mod) {
     e.preventDefault();
-    const o = caretOffset(el);
-    if (!b.text.trim() && b.type !== 'action' && b.type !== 'scene') { setType(b, 'action'); return; }
-    if (o === 0 && b.text) {
-      insertBlock({ id: uid(), type: b.type, text: '' }, i);
-      touched();
-      return;
-    }
-    const before = b.text.slice(0, o), after = b.text.slice(o);
-    b.text = before; el.textContent = before;
-    const nb = { id: uid(), type: after ? b.type : NEXT[b.type], text: after };
-    for (const c of S.doc.comments) if (c.blockId === b.id && c.start >= o) { c.blockId = nb.id; c.start -= o; c.end -= o; }
-    const nel = insertBlock(nb, i + 1);
-    setCaret(nel, 0);
-    $('#elType').value = nb.type;
-    touched(); paintHighlights();
+    handleEnter(el);
     return;
   }
 
@@ -325,7 +352,7 @@ editor.addEventListener('focusin', (e) => {
   const el = e.target.closest('.block');
   if (!el) return;
   S.currentId = el.dataset.id;
-  $('#elType').value = el.dataset.type;
+  syncTypeUI(el.dataset.type);
 });
 
 document.addEventListener('selectionchange', () => {
@@ -343,6 +370,32 @@ $('#elType').addEventListener('change', (e) => {
   setType(b, e.target.value);
   setCaret(elOf(b.id), b.text.length);
 });
+
+// Mobile formatting bar: keep keyboard open when tapping element pills.
+const mobileBar = $('#mobileBar');
+mobileBar.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('button')) e.preventDefault();
+});
+mobileBar.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-set-type]');
+  if (btn && S.doc) {
+    const b = byId(S.currentId) || S.doc.blocks[S.doc.blocks.length - 1];
+    setType(b, btn.dataset.setType);
+    if (document.activeElement !== elOf(b.id)) setCaret(elOf(b.id), b.text.length);
+    return;
+  }
+  if (e.target.closest('#mobileCommentBtn')) startComment();
+});
+
+// Float the mobile bar above the on-screen keyboard on iOS / Android.
+if (window.visualViewport) {
+  const syncViewport = () => {
+    const kb = Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop);
+    document.documentElement.style.setProperty('--kb-offset', `${Math.round(kb)}px`);
+  };
+  visualViewport.addEventListener('resize', syncViewport);
+  visualViewport.addEventListener('scroll', syncViewport);
+}
 
 $('#title').addEventListener('input', (e) => {
   S.doc.title = e.target.value;
@@ -370,6 +423,7 @@ tp.addEventListener('input', (e) => {
 function setStatus(text, kind = '') {
   const el = $('#status');
   el.textContent = text;
+  el.title = text;
   el.className = 'status ' + kind;
 }
 
@@ -440,6 +494,9 @@ setInterval(async () => {
 
 $('#shareBtn').addEventListener('click', async () => {
   const url = `${location.origin}${location.pathname}#/p/${S.id}`;
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title: S.doc.title || 'Screenplay', url }); return; } catch { /* fallback to copy */ }
+  }
   try { await navigator.clipboard.writeText(url); toast('Link copied — anyone with it can view & edit'); }
   catch { prompt('Share this link', url); }
 });
@@ -501,7 +558,12 @@ function rangeFor(blockId, s, e) {
 }
 
 function paintHighlights() {
-  if (!window.CSS?.highlights || !S.doc) return;
+  if (!S.doc) return;
+  const commentedBlocks = new Set();
+  for (const c of S.doc.comments) if (visible(c)) commentedBlocks.add(c.blockId);
+  for (const el of editor.querySelectorAll('.block')) el.classList.toggle('has-comment', commentedBlocks.has(el.dataset.id));
+
+  if (!window.CSS?.highlights) return;
   const all = [], act = [];
   for (const c of S.doc.comments) {
     if (!visible(c)) continue;
@@ -516,11 +578,12 @@ function paintHighlights() {
 
 function startComment() {
   const sel = getSelection();
-  const node = sel.anchorNode;
-  const el = (node?.nodeType === 1 ? node : node?.parentElement)?.closest?.('.block');
-  if (!el) return toast('Put your cursor on a line to comment');
+  const node = sel?.anchorNode;
+  let el = (node?.nodeType === 1 ? node : node?.parentElement)?.closest?.('.block');
+  if (!el && S.currentId) el = elOf(S.currentId);
+  if (!el) return toast('Tap a line in the script first to comment');
   const b = byId(el.dataset.id);
-  if (!b.text.trim()) return toast('Write something first');
+  if (!b.text.trim()) return toast('Write something on this line first');
   let [s, e] = selOffsets(el);
   if (s > e) [s, e] = [e, s];
   if (s === e) { s = 0; e = b.text.length; }
@@ -560,6 +623,16 @@ function renderComments() {
     .sort((a, b) => (order.get(a.blockId) ?? 1e9) - (order.get(b.blockId) ?? 1e9) || a.start - b.start);
 
   const frag = document.createDocumentFragment();
+  const hdr = document.createElement('div');
+  hdr.className = 'gutter-header';
+  hdr.innerHTML = `
+    <strong>Comments</strong>
+    <div class="gutter-header-actions">
+      <button type="button" class="ghost" data-act="new-comment">+ Add</button>
+      <button type="button" class="ghost" data-act="close-gutter" aria-label="Close comments">Done</button>
+    </div>`;
+  frag.append(hdr);
+
   const resolvedCount = S.doc.comments.filter((c) => c.resolved).length;
   if (resolvedCount) {
     const tools = document.createElement('div');
@@ -574,7 +647,7 @@ function renderComments() {
     d.innerHTML = `
       <blockquote>${esc(S.composer.quote)}</blockquote>
       ${store.getName() ? '' : '<input name="author" placeholder="Your name" autocomplete="name">'}
-      <textarea placeholder="Add a comment…  (⌘↵ to post)"></textarea>
+      <textarea placeholder="Add a comment…"></textarea>
       <div class="row"><button class="ghost" data-act="cancel">Cancel</button><button class="primary" data-act="post">Comment</button></div>`;
     frag.append(d);
   }
@@ -589,7 +662,7 @@ function renderComments() {
   if (!list.length && !S.composer) {
     const e = document.createElement('div');
     e.className = 'gutter-empty';
-    e.innerHTML = 'No comments yet.<br>Select text and press <kbd>⌘M</kbd>.';
+    e.innerHTML = 'No comments yet.<br>Select text or tap <b>+ Comment</b>.';
     frag.append(e);
   }
   gutter.replaceChildren(frag);
@@ -662,6 +735,8 @@ function postComment() {
 gutter.addEventListener('click', (e) => {
   const act = e.target.closest('[data-act]')?.dataset.act;
   const card = e.target.closest('.card');
+  if (act === 'close-gutter') { document.body.classList.remove('comments-open'); renderComments(); return; }
+  if (act === 'new-comment') { startComment(); return; }
   if (act === 'show-resolved') { S.showResolved = e.target.checked; renderComments(); return; }
   if (act === 'cancel') { S.composer = null; renderComments(); return; }
   if (act === 'post') { postComment(); return; }
@@ -677,6 +752,11 @@ gutter.addEventListener('click', (e) => {
     const el = elOf(c.blockId);
     if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
+});
+
+$('#gutterBackdrop').addEventListener('click', () => {
+  document.body.classList.remove('comments-open');
+  renderComments();
 });
 
 gutter.addEventListener('keydown', (e) => {
